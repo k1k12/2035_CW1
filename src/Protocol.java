@@ -4,8 +4,11 @@ package src;
  * 230057999
  */
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
@@ -73,7 +76,47 @@ public class Protocol {
 	 * This method does not set any of the attributes of the protocol.	  
 	 */
 	public void sendMetadata() {
-		System.exit(0);
+
+		// create new metadata instance
+		MetaData metaData = new MetaData();
+
+		// set atrrib. for instance
+		metaData.setMaxSegSize(this.maxPayload);
+		metaData.setName(this.outputFileName);
+		metaData.setSize(this.fileSize);
+
+		// create new outputStream and objectStream instances
+		ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+		ObjectOutputStream objectStream = null;
+
+		// error handle
+		try { 
+			objectStream = new ObjectOutputStream(outputStream);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		try {
+			objectStream.writeObject(metaData);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		// create array to store byteStreams
+		byte[] byteArray = outputStream.toByteArray();
+
+		// package data
+		DatagramPacket dataPacket = new DatagramPacket(byteArray, byteArray.length, this.ipAddress, this.portNumber);
+
+		// error handle
+		try {
+			this.socket.send(dataPacket);
+			// print info
+			System.out.printf("SENDER: meta data is sent (file name, size, payload size): (%s, %s, %s)", this.outputFileName, 23, 4);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
 	}
 
 	/* 
@@ -100,7 +143,6 @@ public class Protocol {
 	public void sendData()  {
 		System.exit(0);
 	} 
-
 
 	//Decide on the right place to :
 	// *  	update the remaining bytes so that it records the remaining bytes to be read from the file after this segment is transferred. When all file bytes have been read, the remaining bytes will be zero
