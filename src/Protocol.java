@@ -1,3 +1,4 @@
+package src;
 /*
  * Replace the following string of 0s with your student number
  * 230057999
