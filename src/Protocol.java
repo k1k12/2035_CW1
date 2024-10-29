@@ -6,6 +6,7 @@ package src;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
@@ -71,7 +72,7 @@ public class Protocol {
 	 *      size - the size of the file to send 
 	 *      name - the name of the file to create on the server
 	 *      maxSegSize - The size of the payload of the data segment
-	 * deal with error in sending
+	 * deal with error in sending (TO DO)
 	 * output relevant information messages for the user to follow progress of the file transfer.
 	 * This method does not set any of the attributes of the protocol.	  
 	 */
@@ -130,8 +131,48 @@ public class Protocol {
 	 * The method returns -1 if this is the last data segment (no more data to be read) and 0 otherwise.
 	 */
 	public int readData() { 
-		System.exit(0);
+
+		ByteArrayOutputStream result = new ByteArrayOutputStream();
+		byte[] buffer = new byte[this.maxPayload];
+		int sq = 0;
+
+		try {
+
+			// create FIS instance, byte buffer variable, and bytesRead variable
+			FileInputStream fis = new FileInputStream(this.inputFile);
+			int bytesRead = 0;
+			
+			// iterate through data (each iteration ~ buffer)
+			while((bytesRead = fis.read(buffer)) != -1)
+			{
+				// increase sq
+				sq = sq + 1;
+
+				// read into dataSeg
+				// --> set sequence number
+				this.dataSeg.setSq(sq);
+				// --> set size
+				this.dataSeg.setSize(bytesRead);
+				// --> set type
+				this.dataSeg.setType(SegmentType.Data);
+				// --> set payload
+				for (int length; (length = fis.read(buffer)) != -1; ) {
+					result.write(buffer, 0, length);
+				}
+				this.dataSeg.setPayLoad(result.toString("UTF-8"));
+
+			}
+			
+			fis.close();
+			return -1;
+
+		} catch (IOException e) {
+			// file not found, handle case
+			e.printStackTrace();
+		} 
+
 		return 0;
+		// return 0 if more data to be read
 	}
 
 	/* 
@@ -141,6 +182,21 @@ public class Protocol {
 	 * output relevant information messages for the user to follow progress of the file transfer.
 	 */
 	public void sendData()  {
+
+		// int checksum = 
+		// package data
+		// DatagramPacket dataPacket = new DatagramPacket(this.dataSeg, this.dataSeg.getSize(), this.ipAddress, this.portNumber);
+
+		// error handle
+		// try {
+			
+		// 	// this.socket.send(dataPacket);
+		// 	// print info
+		// 	System.out.printf("SENDER: meta data is sent (file name, size, payload size): (%s, %s, %s)", this.outputFileName, 23, 4);
+		// } catch (IOException e) {
+		// 	e.printStackTrace();
+		// }
+		
 		System.exit(0);
 	} 
 
