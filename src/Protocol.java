@@ -93,11 +93,6 @@ public class Protocol {
 		// error handle
 		try { 
 			objectStream = new ObjectOutputStream(outputStream);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-		try {
 			objectStream.writeObject(metaData);
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -132,43 +127,37 @@ public class Protocol {
 	 */
 	public int readData() { 
 
+		// create new byte output stream and buffer array
 		ByteArrayOutputStream result = new ByteArrayOutputStream();
 		byte[] buffer = new byte[this.maxPayload];
-		int sq = 0;
+
+		// Create sequence counter
+		int sq = 1;
 
 		try {
 
 			// create FIS instance, byte buffer variable, and bytesRead variable
 			FileInputStream fis = new FileInputStream(this.inputFile);
-			int bytesRead = 0;
 			
-			// iterate through data (each iteration ~ buffer)
-			while((bytesRead = fis.read(buffer)) != -1)
-			{
-				// increase sq
-				sq = sq + 1;
-
-				// read into dataSeg
-				// --> set sequence number
-				this.dataSeg.setSq(sq);
-				// --> set size
-				this.dataSeg.setSize(bytesRead);
-				// --> set type
-				this.dataSeg.setType(SegmentType.Data);
-				// --> set payload
-				for (int length; (length = fis.read(buffer)) != -1; ) {
-					result.write(buffer, 0, length);
-				}
-				this.dataSeg.setPayLoad(result.toString("UTF-8"));
-
+			// --> set sequence number
+			this.dataSeg.setSq(sq);
+			// --> set size
+			this.dataSeg.setSize(fis.read(buffer));
+			// --> set type
+			this.dataSeg.setType(SegmentType.Data);
+			// --> set payload (fix)
+			for (int length; (length = fis.read(buffer)) != -1; ) {
+				result.write(buffer, 0, length);
 			}
-			
+			this.dataSeg.setPayLoad(result.toString("UTF-8"));
+		
 			fis.close();
-			return -1;
 
 		} catch (IOException e) {
 			// file not found, handle case
 			e.printStackTrace();
+			return -1;
+
 		} 
 
 		return 0;
@@ -184,18 +173,33 @@ public class Protocol {
 	public void sendData()  {
 
 		// int checksum = 
-		// package data
-		// DatagramPacket dataPacket = new DatagramPacket(this.dataSeg, this.dataSeg.getSize(), this.ipAddress, this.portNumber);
+
+		// create output streams
+		ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+		ObjectOutputStream objectStream = null;
 
 		// error handle
-		// try {
-			
-		// 	// this.socket.send(dataPacket);
-		// 	// print info
-		// 	System.out.printf("SENDER: meta data is sent (file name, size, payload size): (%s, %s, %s)", this.outputFileName, 23, 4);
-		// } catch (IOException e) {
-		// 	e.printStackTrace();
-		// }
+		try { 
+			objectStream = new ObjectOutputStream(outputStream);
+			objectStream.writeObject(this.dataSeg);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		// create array to store byteStreams
+		byte[] byteArray = outputStream.toByteArray();
+
+		// package data
+		DatagramPacket dataPacket = new DatagramPacket(byteArray, byteArray.length, this.ipAddress, this.portNumber);
+
+		// error handle
+		try {
+			this.socket.send(dataPacket);
+			// print info --> add checksum
+			System.out.printf("SENDER: Sending segment: sq:%s, size:%s, checksum: null, content: %s", this.dataSeg.getSq(), this.dataSeg.getSize(), this.dataSeg.getPayLoad());
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 		
 		System.exit(0);
 	} 
