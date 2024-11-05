@@ -4,10 +4,12 @@ package src;
  * 230057999
  */
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -108,7 +110,7 @@ public class Protocol {
 		try {
 			this.socket.send(dataPacket);
 			// print info
-			System.out.printf("SENDER: meta data is sent (file name, size, payload size): (%s, %s, %s)", this.outputFileName, 23, 4);
+			System.out.printf("SENDER: meta data is sent (file name, size, payload size): (%s, %s, %s)\n", this.outputFileName, 23, 4);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -127,7 +129,7 @@ public class Protocol {
 	 */
 	public int readData() { 
 
-		// create new byte output stream and buffer array
+		// create var bytesToRead
 		int bytesToRead = Math.min((int) this.remainingBytes, this.maxPayload);
 		byte[] buffer = new byte[bytesToRead];
 
@@ -135,9 +137,11 @@ public class Protocol {
 
 			// create FIS instance, byte buffer variable, and bytesRead variable
 			FileInputStream fis = new FileInputStream(this.inputFile);
-			
+			// --> skip buffer
+			fis.skipNBytes(this.sentBytes);
+
 			// --> set sequence number
-			this.dataSeg.setSq(this.sentBytes % 2);
+			this.dataSeg.setSq((this.sentBytes / this.maxPayload) % 2);
 			// --> set size
 			this.dataSeg.setSize(bytesToRead);
 			// --> set type
@@ -145,19 +149,27 @@ public class Protocol {
 			// --> set payload
 			fis.readNBytes(buffer, 0, bytesToRead);
 			this.dataSeg.setPayLoad(new String(buffer));
-			// --> skip buffer and close
-			fis.skip(this.sentBytes);
+
+			// increment sentBytes and decrement remainingBytes
+			this.sentBytes += bytesToRead; 
+			this.remainingBytes -= bytesToRead;
+			this.totalSegments += 1;
+
+			// close fis
 			fis.close();
+
+			// if no data left
+			if (this.remainingBytes == 0) {
+				return -1;
+			}
 
 		} catch (IOException e) {
 			// file not found, handle case
 			e.printStackTrace();
-			return -1;
-
 		} 
 
-		return 0;
 		// return 0 if more data to be read
+		return 0;
 	}
 
 	/* 
@@ -193,7 +205,7 @@ public class Protocol {
 		try {
 			this.socket.send(dataPacket);
 			// print info --> add checksum
-			System.out.printf("SENDER: Sending segment: sq:%s, size:%s, checksum: %s, content: %s", this.dataSeg.getSq(), this.dataSeg.getSize(), this.dataSeg.getChecksum(), this.dataSeg.getPayLoad());
+			System.out.printf("SENDER: Sending segment: sq:%s, size:%s, checksum: %s, content: %s\n", this.dataSeg.getSq(), this.dataSeg.getSize(), this.dataSeg.getChecksum(), this.dataSeg.getPayLoad());
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -214,9 +226,45 @@ public class Protocol {
 	 * return true if no error
 	 * output relevant information messages for the user to follow progress of the file transfer.
 	 */
-	public boolean receiveAck(int expectedDataSq)  {
-		System.exit(0);
+	public boolean receiveAck(int expectedDataSq) throws IOException {
+
+		// create buffer to recieve packet
+		byte[] buffer = new byte[1024];
+	
+		// packet to send across net
+		DatagramPacket ack = new DatagramPacket(buffer, buffer.length);
+
+		// recieve packet
+		this.socket.receive(ack);
+
+		// store data in byte array
+		byte[] ackData = ack.getData();
+		
+		// create input streams
+		ByteArrayInputStream bis = new ByteArrayInputStream(ackData);
+		ObjectInputStream objectStream = new ObjectInputStream(bis);
+
+		// error handle
+		try {
+			// read object
+			this.ackSeg = (Segment) objectStream.readObject();
+			// check sq number
+			if (this.ackSeg.getSq() == expectedDataSq) {
+				// if correct
+				System.out.printf("SENDER: ACK sq=%s RECIEVED\n", this.ackSeg.getSq());
+				return true;
+			} else {
+				// if incorrect
+				System.err.println("Error Detected in ACK Packet, exiting...\n");
+				return false;
+			}
+		} catch (IOException | ClassNotFoundException e) {
+			// error catch
+			e.printStackTrace();
+		}
+
 		return false;
+		
 	} 
 
 	/* 
@@ -353,8 +401,8 @@ public class Protocol {
 	{
 		File file = new File(fileName);
 		if(!file.exists()) {
-			System.out.println("SENDER: File does not exists"); 
-			System.out.println("SENDER: Exit .."); 
+			System.out.println("SENDER: File does not exists\n"); 
+			System.out.println("SENDER: Exit ..\n"); 
 			System.exit(0);
 		}
 		return file;
