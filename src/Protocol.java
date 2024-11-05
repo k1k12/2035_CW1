@@ -128,11 +128,8 @@ public class Protocol {
 	public int readData() { 
 
 		// create new byte output stream and buffer array
-		ByteArrayOutputStream result = new ByteArrayOutputStream();
-		byte[] buffer = new byte[this.maxPayload];
-
-		// Create sequence counter
-		int sq = 1;
+		int bytesToRead = Math.min((int) this.remainingBytes, this.maxPayload);
+		byte[] buffer = new byte[bytesToRead];
 
 		try {
 
@@ -140,17 +137,16 @@ public class Protocol {
 			FileInputStream fis = new FileInputStream(this.inputFile);
 			
 			// --> set sequence number
-			this.dataSeg.setSq(sq);
+			this.dataSeg.setSq(this.sentBytes % 2);
 			// --> set size
-			this.dataSeg.setSize(fis.read(buffer));
+			this.dataSeg.setSize(bytesToRead);
 			// --> set type
 			this.dataSeg.setType(SegmentType.Data);
-			// --> set payload (fix)
-			for (int length; (length = fis.read(buffer)) != -1; ) {
-				result.write(buffer, 0, length);
-			}
-			this.dataSeg.setPayLoad(result.toString("UTF-8"));
-		
+			// --> set payload
+			fis.readNBytes(buffer, 0, bytesToRead);
+			this.dataSeg.setPayLoad(new String(buffer));
+			// --> skip buffer and close
+			fis.skip(this.sentBytes);
 			fis.close();
 
 		} catch (IOException e) {
@@ -172,7 +168,8 @@ public class Protocol {
 	 */
 	public void sendData()  {
 
-		// int checksum = 
+		// set checksum
+		this.dataSeg.setChecksum(Protocol.checksum(this.dataSeg.getPayLoad(), false));
 
 		// create output streams
 		ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -196,12 +193,11 @@ public class Protocol {
 		try {
 			this.socket.send(dataPacket);
 			// print info --> add checksum
-			System.out.printf("SENDER: Sending segment: sq:%s, size:%s, checksum: null, content: %s", this.dataSeg.getSq(), this.dataSeg.getSize(), this.dataSeg.getPayLoad());
+			System.out.printf("SENDER: Sending segment: sq:%s, size:%s, checksum: %s, content: %s", this.dataSeg.getSq(), this.dataSeg.getSize(), this.dataSeg.getChecksum(), this.dataSeg.getPayLoad());
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 		
-		System.exit(0);
 	} 
 
 	//Decide on the right place to :
