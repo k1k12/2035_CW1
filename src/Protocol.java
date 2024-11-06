@@ -277,7 +277,57 @@ public class Protocol {
 	 * output relevant information messages for the user to follow progress of the file transfer.
 	 */
 	public void sendDataWithError() throws IOException {
-		System.exit(0);
+
+		// check if max retries exceeded
+		if (this.maxRetries > this.currRetry) {
+			// error message and exit
+			System.err.println("SENDER: maximum attempts exceeded, cancelling file transmission...\n");
+			System.exit(1);
+		}
+
+		// create var representiting prob of loss
+		Boolean isCorrupted = isCorrupted(this.lossProb);
+		
+		// set checksum
+		this.dataSeg.setChecksum(
+			Protocol.checksum(
+				this.dataSeg.getPayLoad(), 
+				isCorrupted
+			)
+		);
+
+		// Print out corruption message
+		if (isCorrupted) {
+			System.out.println("SENDER: Segment has been corrupted!\n");
+		}
+
+		// create output streams
+		ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+		ObjectOutputStream objectStream = null;
+
+		// error handle
+		try { 
+			objectStream = new ObjectOutputStream(outputStream);
+			objectStream.writeObject(this.dataSeg);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		// create array to store byteStreams
+		byte[] byteArray = outputStream.toByteArray();
+
+		// package data
+		DatagramPacket dataPacket = new DatagramPacket(byteArray, byteArray.length, this.ipAddress, this.portNumber);
+
+		// error handle
+		try {
+			this.socket.send(dataPacket);
+			// print info --> add checksum
+			System.out.printf("SENDER: Sending segment: sq:%s, size:%s, checksum: %s, content: %s\n", this.dataSeg.getSq(), this.dataSeg.getSize(), this.dataSeg.getChecksum(), this.dataSeg.getPayLoad());
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
 	} 
 
 	/* 
