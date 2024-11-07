@@ -15,6 +15,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 
 public class Protocol {
@@ -22,7 +23,7 @@ public class Protocol {
 	static final String  NORMAL_MODE="nm"   ; // normal transfer mode: (for Part 1 and 2)
 	static final String	 TIMEOUT_MODE ="wt"  ; // timeout transfer mode: (for Part 3)
 	static final String	 GBN_MODE ="gbn"  ;    // GBN transfer mode: (for Part 4)
-	static final int DEFAULT_TIMEOUT =10  ;     // default timeout in seconds (for Part 3)
+	static final int DEFAULT_TIMEOUT =4  ;     // default timeout in seconds (for Part 3)
 	static final int DEFAULT_RETRIES =4  ;    // default number of consecutive retries (for Part 3)
 
 	/*
@@ -34,7 +35,7 @@ public class Protocol {
 	private InetAddress ipAddress;      // the address of the server to transfer the file to. This should be a well-formed IP address.
 	private int portNumber; 		    // the  port the server is listening on
 	private DatagramSocket socket;     // The socket that the client bind to
-	private String mode;               //mode of transfer normal/with timeout/GBN
+	private String mode;               // mode of transfer normal/with timeout/GBN
 
 	private File inputFile;           // The client-side input file to transfer  
 	private String inputFileName;      // the name of the client-side input file for transfer to the server
@@ -110,7 +111,7 @@ public class Protocol {
 		try {
 			this.socket.send(dataPacket);
 			// print info
-			System.out.printf("SENDER: meta data is sent (file name, size, payload size): (%s, %s, %s)\n", this.outputFileName, 23, 4);
+			System.out.printf("SENDER: Meta data is sent (file name, size, payload size): (%s, %s, %s)\n", this.outputFileName, 23, 4);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -204,8 +205,8 @@ public class Protocol {
 		// error handle
 		try {
 			this.socket.send(dataPacket);
-			// print info --> add checksum
-			System.out.printf("SENDER: Sending segment: sq:%s, size:%s, checksum: %s, content: %s\n", this.dataSeg.getSq(), this.dataSeg.getSize(), this.dataSeg.getChecksum(), this.dataSeg.getPayLoad());
+			// print info
+			System.out.printf("\nSENDER: Sending segment: sq:%s, size:%s, checksum: %s, content: %s\n", this.dataSeg.getSq(), this.dataSeg.getSize(), this.dataSeg.getChecksum(), this.dataSeg.getPayLoad());
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -279,9 +280,9 @@ public class Protocol {
 	public void sendDataWithError() throws IOException {
 
 		// check if max retries exceeded
-		if (this.maxRetries > this.currRetry) {
+		if (this.currRetry == this.maxRetries) {
 			// error message and exit
-			System.err.println("SENDER: maximum attempts exceeded, cancelling file transmission...\n");
+			System.err.println("SENDER: Maximum attempts exceeded, cancelling file transmission...\n");
 			System.exit(1);
 		}
 
@@ -296,7 +297,7 @@ public class Protocol {
 			)
 		);
 
-		// Print out corruption message
+		// print out corruption message
 		if (isCorrupted) {
 			System.out.println("SENDER: Segment has been corrupted!\n");
 		}
@@ -322,7 +323,7 @@ public class Protocol {
 		// error handle
 		try {
 			this.socket.send(dataPacket);
-			// print info --> add checksum
+			// print info
 			System.out.printf("SENDER: Sending segment: sq:%s, size:%s, checksum: %s, content: %s\n", this.dataSeg.getSq(), this.dataSeg.getSize(), this.dataSeg.getChecksum(), this.dataSeg.getPayLoad());
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -344,10 +345,41 @@ public class Protocol {
 	 * 
 	 * relevant methods that need to be used include: readData(), sendDataWithError(), receiveAck().
 	 */
-	void sendFileWithTimeout() throws IOException 
-	{
-		System.exit(0);
+	void sendFileWithTimeout() throws IOException {
+
+		// set timeout
+		this.socket.setSoTimeout(this.timeout * 1000);
+
+		// send file normal 
+		while (this.remainingBytes!=0) {
+			readData(); 
+			// reset current retry counter
+			this.currRetry = 0;
+			while (this.currRetry < this.maxRetries) {
+				try {
+					// send potentially corrupted data
+					sendDataWithError();
+					// recieve ack
+					receiveAck(this.dataSeg.getSq());
+					// exit loop
+					break;
+				} catch (SocketTimeoutException e) {
+					// increment retries
+					this.currRetry += 1;
+					// increment resent segments
+					this.resentSegments += 1;
+					// print timeout message
+					System.out.printf("SENDER: TIMEOUT ALERT: Re-sending the same segment again, current retry: %s\n\n", this.currRetry);					
+
+				}
+			}
+
+		}
+
+		System.out.println("Total Segments "+ this.totalSegments ); 
+		System.out.println("\nRe-sent Segments " + this.resentSegments);
 	} 
+
 	/*
 	 *  transfer the given file using the resources provided by the protocol structure using GoBackN.
 	 */
