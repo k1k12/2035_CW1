@@ -252,7 +252,7 @@ public class Protocol {
 			// check sq number
 			if (this.ackSeg.getSq() == expectedDataSq) {
 				// if correct
-				System.out.printf("SENDER: ACK sq=%s RECIEVED\n", this.ackSeg.getSq());
+				System.out.printf("SENDER: ACK sq=%s RECIEVED\n\n", this.ackSeg.getSq());
 				return true;
 			} else {
 				// if incorrect
@@ -282,7 +282,7 @@ public class Protocol {
 		// check if max retries exceeded
 		if (this.currRetry == this.maxRetries) {
 			// error message and exit
-			System.err.println("SENDER: Maximum attempts exceeded, cancelling file transmission...\n");
+			System.out.println("\nSENDER: Maximum attempts exceeded, cancelling file transmission...\n");
 			System.exit(1);
 		}
 
@@ -355,7 +355,7 @@ public class Protocol {
 			readData(); 
 			// reset current retry counter
 			this.currRetry = 0;
-			while (this.currRetry < this.maxRetries) {
+			while (this.currRetry <= this.maxRetries) {
 				try {
 					// send potentially corrupted data
 					sendDataWithError();
@@ -364,13 +364,12 @@ public class Protocol {
 					// exit loop
 					break;
 				} catch (SocketTimeoutException e) {
+					// print timeout message
+					System.out.printf("SENDER: TIMEOUT ALERT: Re-sending the same segment again, current retry: %s\n", this.currRetry);					
 					// increment retries
 					this.currRetry += 1;
 					// increment resent segments
 					this.resentSegments += 1;
-					// print timeout message
-					System.out.printf("SENDER: TIMEOUT ALERT: Re-sending the same segment again, current retry: %s\n\n", this.currRetry);					
-
 				}
 			}
 
@@ -489,4 +488,5 @@ public class Protocol {
 		}
 		return file;
 	}
+
 }
