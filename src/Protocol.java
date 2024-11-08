@@ -17,6 +17,7 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 
 public class Protocol {
 
@@ -111,7 +112,7 @@ public class Protocol {
 		try {
 			this.socket.send(dataPacket);
 			// print info
-			System.out.printf("SENDER: Meta data is sent (file name, size, payload size): (%s, %s, %s)\n", this.outputFileName, 23, 4);
+			System.out.printf("SENDER: Meta data is sent (file name, size, payload size): (%s, %s, %s)\n\n", this.outputFileName, 23, 4);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -365,7 +366,7 @@ public class Protocol {
 					break;
 				} catch (SocketTimeoutException e) {
 					// print timeout message
-					System.out.printf("SENDER: TIMEOUT ALERT: Re-sending the same segment again, current retry: %s\n", this.currRetry);					
+					System.out.printf("SENDER: TIMEOUT ALERT: Re-sending the same segment again, current retry: %s\n\n", this.currRetry);					
 					// increment retries
 					this.currRetry += 1;
 					// increment resent segments
@@ -382,10 +383,89 @@ public class Protocol {
 	/*
 	 *  transfer the given file using the resources provided by the protocol structure using GoBackN.
 	 */
-	void sendFileNormalGBN(int window) throws IOException
-	{  
-		System.exit(0);
-	}	
+	void sendFileNormalGBN(int window) throws IOException {
+
+		// create list to store ack responses
+		ArrayList<Integer> acksRecieved = new ArrayList<>();
+		// create var for total acks expected
+		int expectedAcks = (int) Math.ceil(this.fileSize / this.maxPayload);
+		// create counter var
+		int ackToRecieve = 0;
+
+		// send initial window print
+		System.out.printf("\n---------------Sending the segments in the initial window --------------------------\n");
+
+		// send num segments = window
+		for (int i = 0; i < window; i++) {
+
+			// read data
+			readData();
+			// set sequence number
+			this.dataSeg.setSq(i);
+			// send data
+			sendData();
+
+			// set ackToRecieve
+			if (ackToRecieve == window) {
+				ackToRecieve = 0;
+			}	else {				
+				// otherwise increment
+				ackToRecieve += 1;
+			}
+
+		}
+		
+		
+		// print wait statement
+		System.out.printf("\n-----------------------------------------------------------\n");
+		System.out.printf("SENDER: Waiting for an ack and slide the window if the ack number is correct\n");
+		System.out.printf("-----------------------------------------------------------\n");
+
+		// print slide window statement
+		System.out.printf("\nSENDER: Current outstanding Acks %s\n", acksRecieved);
+		System.out.printf("\n----------------------------------------\n");
+		
+		// iterate through until length of array is equal to amount of expected acks
+		while (acksRecieved.size() <= expectedAcks) {
+
+			// if data left to send
+			if (this.remainingBytes!=0) {
+				// store last sequence number
+				int prevSqNum = this.dataSeg.getSq();
+				// read data
+				readData();
+				// if last sequence number = window size
+				if (prevSqNum == window) {
+					this.dataSeg.setSq(0);
+				}	else {				
+					// otherwise increment
+					this.dataSeg.setSq(prevSqNum+1);
+				}
+				// send data
+				sendData();
+
+				// print slide window statement
+				System.out.printf("\nSENDER: Slide the window and send the next segment\n");
+	
+			}
+			
+			// recieve ack and append to acksRecieved
+			if (receiveAck(ackToRecieve)) {
+				acksRecieved.add(ackToRecieve);
+			}	
+
+			// set ackToRecieve
+			if (ackToRecieve == window) {
+				ackToRecieve = 0;
+			}	else {				
+				// otherwise increment
+				ackToRecieve += 1;
+			}
+
+			}
+
+			System.out.println("Total Segments "+ this.totalSegments );  
+	}
 
 	/*************************************************************************************************************************************
 	 **************************************************************************************************************************************
@@ -397,14 +477,15 @@ public class Protocol {
 	/* 
 	 * This method initialises ALL the 19 attributes needed to allow the Protocol methods to work properly
 	 */
-	public void initProtocol(String hostName , String portNumber, String fileName, String outputFileName, String payloadSize, String mode) throws UnknownHostException, SocketException {
+	public void initProtocol(String hostName, String portNumber, String fileName, String outputFileName, String payloadSize, String mode) throws UnknownHostException, SocketException {
+
 		this.portNumber = Integer.parseInt(portNumber);
 		this.ipAddress = InetAddress.getByName(hostName);
 		this.socket = new DatagramSocket();
 		this.inputFile = checkFile(fileName);
 		this.inputFileName = fileName;
-		this.outputFileName =  outputFileName;
-		this.fileSize       =this.inputFile.length();
+		this.outputFileName = outputFileName;
+		this.fileSize = this.inputFile.length();
 
 		this.remainingBytes = this.fileSize;
 		this.maxPayload = Integer.parseInt(payloadSize);
@@ -416,11 +497,13 @@ public class Protocol {
 		this.maxRetries = DEFAULT_RETRIES;
 
 		this.sentBytes = 0;
-		this.lossProb =0;
-		this.totalSegments =0;
+		this.lossProb = 0;
+		this.totalSegments = 0;
 		this.resentSegments = 0;
-		this.currRetry = 0;		
+		this.currRetry = 0;
+
 	}
+
 
 	/* transfer the given file using the resources provided by the protocol
 	 *      attributes, according to the normal file transfer without timeout
