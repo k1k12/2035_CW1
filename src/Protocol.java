@@ -254,6 +254,7 @@ public class Protocol {
 			if (this.ackSeg.getSq() == expectedDataSq) {
 				// if correct
 				System.out.printf("SENDER: ACK sq=%s RECIEVED\n\n", this.ackSeg.getSq());
+				System.out.println("----------------------------------------\n");
 				return true;
 			} else {
 				// if incorrect
@@ -301,6 +302,7 @@ public class Protocol {
 		// print out corruption message
 		if (isCorrupted) {
 			System.out.println("SENDER: Segment has been corrupted!\n");
+			System.out.println("----------------------------------------\n");
 		}
 
 		// create output streams
@@ -366,7 +368,7 @@ public class Protocol {
 					break;
 				} catch (SocketTimeoutException e) {
 					// print timeout message
-					System.out.printf("SENDER: TIMEOUT ALERT: Re-sending the same segment again, current retry: %s\n\n", this.currRetry);					
+					System.out.printf("\nSENDER: TIMEOUT ALERT: Re-sending the same segment again, current retry: %s\n\n", this.currRetry);					
 					// increment retries
 					this.currRetry += 1;
 					// increment resent segments
@@ -432,7 +434,6 @@ public class Protocol {
 			if (receiveAck(ackToRecieve)) {
 				acksRecieved.add(ackToRecieve);
 				outstandingAcks.remove(0);
-				System.out.printf("----------------------------------------\n");
 			}	
 
 			// if data left to send
@@ -453,13 +454,12 @@ public class Protocol {
 				outstandingAcks.add(this.dataSeg.getSq());
 
 				// print slide window statement
-				System.out.printf("----------------------------------------\n");
 				System.out.printf("SENDER: Slide the window and send the next segment\n");
-				
+				System.out.println("----------------------------------------\n");
+
 				// send data
 				sendData();
 
-				System.out.printf("----------------------------------------\n");
 
 			}
 			
