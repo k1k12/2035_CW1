@@ -387,6 +387,8 @@ public class Protocol {
 
 		// create list to store ack responses
 		ArrayList<Integer> acksRecieved = new ArrayList<>();
+		// create list to store outstanding acks
+		ArrayList<Integer> outstandingAcks = new ArrayList<>();
 		// create var for total acks expected
 		int expectedAcks = (int) Math.ceil(this.fileSize / this.maxPayload);
 		// create counter var
@@ -405,13 +407,8 @@ public class Protocol {
 			// send data
 			sendData();
 
-			// set ackToRecieve
-			if (ackToRecieve == window) {
-				ackToRecieve = 0;
-			}	else {				
-				// otherwise increment
-				ackToRecieve += 1;
-			}
+			// add outstanding acks to array
+			outstandingAcks.add(this.dataSeg.getSq());
 
 		}
 		
@@ -421,12 +418,18 @@ public class Protocol {
 		System.out.printf("SENDER: Waiting for an ack and slide the window if the ack number is correct\n");
 		System.out.printf("-----------------------------------------------------------\n");
 
-		// print slide window statement
-		System.out.printf("\nSENDER: Current outstanding Acks %s\n", acksRecieved);
-		System.out.printf("\n----------------------------------------\n");
-		
 		// iterate through until length of array is equal to amount of expected acks
 		while (acksRecieved.size() <= expectedAcks) {
+
+			// print slide window statement
+			System.out.printf("\nSENDER: Current outstanding Acks \n%s\n\n", outstandingAcks);
+		
+			// recieve ack and append to acksRecieved
+			if (receiveAck(ackToRecieve)) {
+				acksRecieved.add(ackToRecieve);
+				outstandingAcks.remove(0);
+				System.out.printf("----------------------------------------\n");
+			}	
 
 			// if data left to send
 			if (this.remainingBytes!=0) {
@@ -441,18 +444,21 @@ public class Protocol {
 					// otherwise increment
 					this.dataSeg.setSq(prevSqNum+1);
 				}
+
+				// add outstanding acks to array
+				outstandingAcks.add(this.dataSeg.getSq());
+
+				// print slide window statement
+				System.out.printf("----------------------------------------\n");
+				System.out.printf("SENDER: Slide the window and send the next segment\n");
+				
 				// send data
 				sendData();
 
-				// print slide window statement
-				System.out.printf("\nSENDER: Slide the window and send the next segment\n");
-	
+				System.out.printf("----------------------------------------\n");
+
 			}
 			
-			// recieve ack and append to acksRecieved
-			if (receiveAck(ackToRecieve)) {
-				acksRecieved.add(ackToRecieve);
-			}	
 
 			// set ackToRecieve
 			if (ackToRecieve == window) {
