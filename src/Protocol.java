@@ -390,9 +390,13 @@ public class Protocol {
 		// create list to store outstanding acks
 		ArrayList<Integer> outstandingAcks = new ArrayList<>();
 		// create var for total acks expected
-		int expectedAcks = (int) Math.ceil(this.fileSize / this.maxPayload);
+		int expectedAcks = (int) Math.ceil(this.fileSize / (double) this.maxPayload);
 		// create counter var
 		int ackToRecieve = 0;
+		// cap window size if > expectedAcks
+		if (window > expectedAcks) {
+			window = expectedAcks;
+		}
 
 		// send initial window print
 		System.out.printf("\n---------------Sending the segments in the initial window --------------------------\n");
@@ -419,7 +423,7 @@ public class Protocol {
 		System.out.printf("-----------------------------------------------------------\n");
 
 		// iterate through until length of array is equal to amount of expected acks
-		while (acksRecieved.size() <= expectedAcks) {
+		while (acksRecieved.size() != expectedAcks) {
 
 			// print slide window statement
 			System.out.printf("\nSENDER: Current outstanding Acks \n%s\n\n", outstandingAcks);
